@@ -10,6 +10,8 @@
 #include <searchresults.hxx>
 #include <sfx2/bindings.hxx>
 #include <sfx2/dispatch.hxx>
+#include <sfx2/viewfrm.hxx>
+#include <svx/srchdlg.hxx>
 #include <dociter.hxx>
 #include <document.hxx>
 #include <tabvwsh.hxx>
@@ -24,6 +26,7 @@ SearchResultsDlg::SearchResultsDlg(SfxBindings* _pBindings, weld::Window* pParen
     , aSkipped(ScResId(SCSTR_SKIPPED))
     , mpBindings(_pBindings)
     , mpDoc(nullptr)
+    , mbSorted(false)
     , mxList(m_xBuilder->weld_tree_view("results"))
     , mxSearchResults(m_xBuilder->weld_label("lbSearchResults"))
     , mxShowDialog(m_xBuilder->weld_check_button("cbShow"))
@@ -35,10 +38,24 @@ SearchResultsDlg::SearchResultsDlg(SfxBindings* _pBindings, weld::Window* pParen
     aWidths.push_back(mxList->get_approximate_digit_width() * 10);
     mxList->set_column_fixed_widths(aWidths);
     mxList->connect_changed(LINK(this, SearchResultsDlg, ListSelectHdl));
+    mxList->connect_column_clicked(LINK(this, SearchResultsDlg, HeaderBarClick));
 }
 
 SearchResultsDlg::~SearchResultsDlg()
 {
+    // tdf#133807 if the search dialog is shown then re-present that dialog
+    // when this results dialog is dismissed
+    SfxViewFrame* pViewFrame = mpBindings->GetDispatcher()->GetFrame();
+    if (!pViewFrame)
+        return;
+    SfxChildWindow* pChildWindow = pViewFrame->GetChildWindow(
+            SvxSearchDialogWrapper::GetChildWindowId());
+    if (!pChildWindow)
+        return;
+    SvxSearchDialog* pSearchDlg = static_cast<SvxSearchDialog*>(pChildWindow->GetController().get());
+    if (!pSearchDlg)
+        return;
+    pSearchDlg->getDialog()->present();
 }
 
 namespace
@@ -159,6 +176,35 @@ void SearchResultsDlg::Close()
     }
 
     SfxDialogController::Close();
+}
+
+IMPL_LINK(SearchResultsDlg, HeaderBarClick, int, nColumn, void)
+{
+    if (!mbSorted)
+    {
+        mxList->make_sorted();
+        mbSorted = true;
+    }
+
+    bool bSortAtoZ = mxList->get_sort_order();
+
+    //set new arrow positions in headerbar
+    if (nColumn == mxList->get_sort_column())
+    {
+        bSortAtoZ = !bSortAtoZ;
+        mxList->set_sort_order(bSortAtoZ);
+    }
+    else
+    {
+        mxList->set_sort_indicator(TRISTATE_INDET, mxList->get_sort_column());
+        mxList->set_sort_column(nColumn);
+    }
+
+    if (nColumn != -1)
+    {
+        //sort lists
+        mxList->set_sort_indicator(bSortAtoZ ? TRISTATE_TRUE : TRISTATE_FALSE, nColumn);
+    }
 }
 
 IMPL_LINK_NOARG( SearchResultsDlg, ListSelectHdl, weld::TreeView&, void )

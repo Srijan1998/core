@@ -128,7 +128,7 @@ public:
     virtual void        StateChanged( StateChangedType nType ) override;
     virtual void        DataChanged( const DataChangedEvent& rDCEvt ) override;
 
-    virtual void        Select();
+    void                Select();
     void                DoubleClick();
     virtual void        GetFocus() override;
     virtual void        LoseFocus() override;
@@ -224,8 +224,6 @@ public:
     void                GetMaxVisColumnsAndLines( sal_uInt16& rnCols, sal_uInt16& rnLines ) const;
 
     sal_uInt16          GetDisplayLineCount() const;
-
-    void                EnableMirroring();
 
     /** checks whether a certain point lies within the bounds of
         a listbox item and returns the item as well as the character position

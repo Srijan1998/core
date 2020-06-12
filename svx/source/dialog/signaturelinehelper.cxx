@@ -14,6 +14,7 @@
 #include <com/sun/star/security/XCertificate.hpp>
 
 #include <comphelper/processfactory.hxx>
+#include <comphelper/sequenceashashmap.hxx>
 #include <comphelper/storagehelper.hxx>
 #include <comphelper/xmlsechelper.hxx>
 #include <config_folders.h>
@@ -22,6 +23,10 @@
 #include <sfx2/docfile.hxx>
 #include <sfx2/docfilt.hxx>
 #include <sfx2/objsh.hxx>
+#include <svx/dialmgr.hxx>
+#include <svx/strings.hrc>
+#include <svx/svdmark.hxx>
+#include <svx/svdview.hxx>
 #include <tools/stream.hxx>
 #include <unotools/localedatawrapper.hxx>
 #include <unotools/streamwrap.hxx>
@@ -118,6 +123,42 @@ uno::Reference<graphic::XGraphic> importSVG(const OUString& rSVG)
     aMediaProperties[0].Value <<= xInputStream;
     uno::Reference<graphic::XGraphic> xGraphic(xProvider->queryGraphic(aMediaProperties));
     return xGraphic;
+}
+
+void setShapeCertificate(SdrView* pView,
+                         const css::uno::Reference<css::security::XCertificate>& xCertificate)
+{
+    const SdrMarkList& rMarkList = pView->GetMarkedObjectList();
+    if (rMarkList.GetMarkCount() < 1)
+    {
+        return;
+    }
+
+    const SdrMark* pMark = rMarkList.GetMark(0);
+    SdrObject* pSignatureLine = pMark->GetMarkedSdrObj();
+    if (!pSignatureLine)
+    {
+        return;
+    }
+
+    // Remember the selected certificate.
+    uno::Reference<beans::XPropertySet> xShapeProps(pSignatureLine->getUnoShape(), uno::UNO_QUERY);
+    comphelper::SequenceAsHashMap aMap(xShapeProps->getPropertyValue("InteropGrabBag"));
+    aMap["SignatureCertificate"] <<= xCertificate;
+    xShapeProps->setPropertyValue("InteropGrabBag",
+                                  uno::makeAny(aMap.getAsConstPropertyValueList()));
+
+    // Read svg and replace placeholder texts.
+    OUString aSvgImage(svx::SignatureLineHelper::getSignatureImage("signature-line-draw.svg"));
+    aSvgImage = aSvgImage.replaceAll("[SIGNED_BY]", SvxResId(RID_SVXSTR_SIGNATURELINE_DSIGNED_BY));
+    OUString aSignerName = svx::SignatureLineHelper::getSignerName(xCertificate);
+    aSvgImage = aSvgImage.replaceAll("[SIGNER_NAME]", aSignerName);
+    OUString aDate = svx::SignatureLineHelper::getLocalizedDate();
+    aDate = SvxResId(RID_SVXSTR_SIGNATURELINE_DATE).replaceFirst("%1", aDate);
+    aSvgImage = aSvgImage.replaceAll("[DATE]", aDate);
+
+    uno::Reference<graphic::XGraphic> xGraphic = svx::SignatureLineHelper::importSVG(aSvgImage);
+    xShapeProps->setPropertyValue("Graphic", uno::Any(xGraphic));
 }
 }
 

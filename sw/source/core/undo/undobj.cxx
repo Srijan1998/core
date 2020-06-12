@@ -1234,7 +1234,8 @@ void SwUndoSaveSection::SaveSection(
     SwContentNode* pCNd = aPam.GetContentNode( false );
     if( pCNd )
         aPam.GetMark()->nContent.Assign( pCNd, 0 );
-    if( nullptr != ( pCNd = aPam.GetContentNode()) )
+    pCNd = aPam.GetContentNode();
+    if( nullptr != pCNd )
         aPam.GetPoint()->nContent.Assign( pCNd, pCNd->Len() );
 
     // Keep positions as SwIndex so that this section can be deleted in DTOR
@@ -1535,6 +1536,19 @@ static bool IsAtStartOfSection(SwPosition const& rAnchorPos)
     return node == rAnchorPos.nNode && rAnchorPos.nContent == 0;
 }
 
+/// passed start / end position could be on section start / end node
+static bool IsAtEndOfSection2(SwPosition const& rPos)
+{
+    return rPos.nNode.GetNode().IsEndNode()
+        || IsAtEndOfSection(rPos);
+}
+
+static bool IsAtStartOfSection2(SwPosition const& rPos)
+{
+    return rPos.nNode.GetNode().IsStartNode()
+        || IsAtStartOfSection(rPos);
+}
+
 static bool IsNotBackspaceHeuristic(
         SwPosition const& rStart, SwPosition const& rEnd)
 {
@@ -1563,22 +1577,26 @@ bool IsDestroyFrameAnchoredAtChar(SwPosition const & rAnchorPos,
         return (rStart < rAnchorPos) && (rAnchorPos < rEnd);
     }
 
+    if (nDelContentType & DelContentType::ExcludeFlyAtStartEnd)
+    {   // exclude selection start and end node
+        return (rAnchorPos.nNode < rEnd.nNode)
+            && (rStart.nNode < rAnchorPos.nNode);
+    }
+
     // in general, exclude the start and end position
     return ((rStart < rAnchorPos)
             || (rStart == rAnchorPos
-                && !(nDelContentType & DelContentType::ExcludeFlyAtStartEnd)
                 // special case: fully deleted node
                 && ((rStart.nNode != rEnd.nNode && rStart.nContent == 0
                         // but not if the selection is backspace/delete!
                         && IsNotBackspaceHeuristic(rStart, rEnd))
-                    || (IsAtStartOfSection(rAnchorPos) && IsAtEndOfSection(rEnd)))))
+                    || (IsAtStartOfSection(rAnchorPos) && IsAtEndOfSection2(rEnd)))))
         && ((rAnchorPos < rEnd)
             || (rAnchorPos == rEnd
-                && !(nDelContentType & DelContentType::ExcludeFlyAtStartEnd)
                 // special case: fully deleted node
                 && ((rEnd.nNode != rStart.nNode && rEnd.nContent == rEnd.nNode.GetNode().GetTextNode()->Len()
                         && IsNotBackspaceHeuristic(rStart, rEnd))
-                    || (IsAtEndOfSection(rAnchorPos) && IsAtStartOfSection(rStart)))));
+                    || (IsAtEndOfSection(rAnchorPos) && IsAtStartOfSection2(rStart)))));
 }
 
 bool IsSelectFrameAnchoredAtPara(SwPosition const & rAnchorPos,
@@ -1613,14 +1631,14 @@ bool IsSelectFrameAnchoredAtPara(SwPosition const & rAnchorPos,
                 && ((rStart.nNode != rEnd.nNode && rStart.nContent == 0
                         // but not if the selection is backspace/delete!
                         && IsNotBackspaceHeuristic(rStart, rEnd))
-                    || IsAtStartOfSection(rStart))))
+                    || (IsAtStartOfSection(rAnchorPos) && IsAtEndOfSection2(rEnd)))))
         && ((rAnchorPos.nNode < rEnd.nNode)
             || (rAnchorPos.nNode == rEnd.nNode
                 && !(nDelContentType & DelContentType::ExcludeFlyAtStartEnd)
                 // special case: fully deleted node
                 && ((rEnd.nNode != rStart.nNode && rEnd.nContent == rEnd.nNode.GetNode().GetTextNode()->Len()
                         && IsNotBackspaceHeuristic(rStart, rEnd))
-                    || IsAtEndOfSection(rEnd))));
+                    || (IsAtEndOfSection(rAnchorPos) && IsAtStartOfSection2(rStart)))));
 }
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

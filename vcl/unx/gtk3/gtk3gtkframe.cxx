@@ -1356,7 +1356,8 @@ void GtkSalFrame::Show( bool bVisible, bool /*bNoActivate*/ )
                     removeGrabLevel();
                     grabPointer(false, true, false);
                     m_pParent->removeGrabLevel();
-                    m_pParent->grabPointer(false, true, false);
+                    bool bParentIsFloatGrabWindow = m_pParent->isFloatGrabWindow();
+                    m_pParent->grabPointer(bParentIsFloatGrabWindow, true, bParentIsFloatGrabWindow);
                 }
             }
             gtk_widget_hide( m_pWindow );
@@ -3086,20 +3087,23 @@ gboolean GtkSalFrame::signalFocus( GtkWidget*, GdkEventFocus* pEvent, gpointer f
     return false;
 }
 
+// change of focus between native widgets within the toplevel
 void GtkSalFrame::signalSetFocus(GtkWindow*, GtkWidget* pWidget, gpointer frame)
 {
-    // do not propagate focus get/lose if floats are open
-    if (m_nFloats)
-        return;
-    // change of focus between native widgets within the toplevel
     GtkSalFrame* pThis = static_cast<GtkSalFrame*>(frame);
-    // tdf#129634 ignore floating toolbars
-    if (pThis->m_nStyle & SalFrameStyleFlags::OWNERDRAWDECORATION)
-        return;
+
+    GtkWidget* pGrabWidget;
+    if (GTK_IS_EVENT_BOX(pThis->m_pWindow))
+        pGrabWidget = GTK_WIDGET(pThis->m_pWindow);
+    else
+        pGrabWidget = GTK_WIDGET(pThis->m_pFixedContainer);
 
     // tdf#129634 interpret losing focus as focus passing explicitly to another widget
-    bool bLoseFocus = pWidget && pWidget != GTK_WIDGET(pThis->m_pFixedContainer);
+    bool bLoseFocus = pWidget && pWidget != pGrabWidget;
+
+    // do not propagate focus get/lose if floats are open
     pThis->CallCallbackExc(bLoseFocus ? SalEvent::LoseFocus : SalEvent::GetFocus, nullptr);
+
     gtk_widget_set_can_focus(GTK_WIDGET(pThis->m_pFixedContainer), !bLoseFocus);
 }
 

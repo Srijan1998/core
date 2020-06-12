@@ -35,6 +35,7 @@
 #include <svl/itemiter.hxx>
 #include <comphelper/sequenceashashmap.hxx>
 #include <sal/log.hxx>
+#include <svx/anchorid.hxx>
 
 #include <com/sun/star/document/XActionLockable.hpp>
 #include <com/sun/star/lang/IndexOutOfBoundsException.hpp>
@@ -62,8 +63,18 @@ void SwTextBoxHelper::create(SwFrameFormat* pShape)
         pShape->GetDoc()->GetDocShell()->GetBaseModel(), uno::UNO_QUERY);
     uno::Reference<text::XTextContentAppend> xTextContentAppend(xTextDocument->getText(),
                                                                 uno::UNO_QUERY);
-
-    xTextContentAppend->appendTextContent(xTextFrame, uno::Sequence<beans::PropertyValue>());
+    try
+    {
+        SdrObject* pSourceSDRShape = pShape->FindRealSdrObject();
+        uno::Reference<text::XTextContent> XSourceShape(pSourceSDRShape->getUnoShape(),
+                                                        uno::UNO_QUERY_THROW);
+        xTextContentAppend->insertTextContentWithProperties(
+            xTextFrame, uno::Sequence<beans::PropertyValue>(), XSourceShape->getAnchor());
+    }
+    catch (uno::Exception&)
+    {
+        xTextContentAppend->appendTextContent(xTextFrame, uno::Sequence<beans::PropertyValue>());
+    }
     // Link FLY and DRAW formats, so it becomes a text box (needed for syncProperty calls).
     uno::Reference<text::XTextFrame> xRealTextFrame(xTextFrame, uno::UNO_QUERY);
     auto pTextFrame = dynamic_cast<SwXTextFrame*>(xRealTextFrame.get());
@@ -687,6 +698,12 @@ void SwTextBoxHelper::syncFlyFrameAttr(SwFrameFormat& rShape, SfxItemSet const& 
         const SfxPoolItem* pItem = aIter.GetCurItem();
         do
         {
+            if (rShape.GetAnchor().GetAnchorId() != RndStdIds::FLY_AS_CHAR)
+            {
+                SwFormatAnchor pShapeAnch = rShape.GetAnchor();
+                aTextBoxSet.Put(pShapeAnch);
+            }
+
             switch (pItem->Which())
             {
                 case RES_VERT_ORIENT:
@@ -698,6 +715,10 @@ void SwTextBoxHelper::syncFlyFrameAttr(SwFrameFormat& rShape, SfxItemSet const& 
                     if (!aRect.IsEmpty())
                         aOrient.SetPos(aOrient.GetPos() + aRect.getY());
 
+                    if (rShape.GetAnchor().GetAnchorId() == RndStdIds::FLY_AT_PAGE)
+                    {
+                        aOrient.SetRelationOrient(rShape.GetVertOrient().GetRelationOrient());
+                    }
                     aTextBoxSet.Put(aOrient);
 
                     // restore height (shrunk for extending beyond the page bottom - tdf#91260)
@@ -718,6 +739,10 @@ void SwTextBoxHelper::syncFlyFrameAttr(SwFrameFormat& rShape, SfxItemSet const& 
                     if (!aRect.IsEmpty())
                         aOrient.SetPos(aOrient.GetPos() + aRect.getX());
 
+                    if (rShape.GetAnchor().GetAnchorId() == RndStdIds::FLY_AT_PAGE)
+                    {
+                        aOrient.SetRelationOrient(rShape.GetHoriOrient().GetRelationOrient());
+                    }
                     aTextBoxSet.Put(aOrient);
                 }
                 break;

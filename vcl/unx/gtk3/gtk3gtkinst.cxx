@@ -7415,6 +7415,15 @@ public:
         {
             GtkWidget* pPlaceHolder = gtk_popover_new(GTK_WIDGET(m_pMenuButton));
             gtk_popover_set_transitions_enabled(GTK_POPOVER(pPlaceHolder), false);
+
+            // tdf#132540 theme the unwanted popover into invisibility
+            GtkStyleContext *pPopoverContext = gtk_widget_get_style_context(pPlaceHolder);
+            GtkCssProvider *pProvider = gtk_css_provider_new();
+            static const gchar data[] = "popover { box-shadow: none; padding: 0 0 0 0; margin: 0 0 0 0; border-image: none; border-image-width: 0 0 0 0; background-image: none; background-color: transparent; border-radius: 0 0 0 0; border-width: 0 0 0 0; border-style: none; border-color: transparent; opacity: 0; min-height: 0; min-width: 0; }";
+            gtk_css_provider_load_from_data(pProvider, data, -1, nullptr);
+            gtk_style_context_add_provider(pPopoverContext, GTK_STYLE_PROVIDER(pProvider),
+                                           GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+
             gtk_menu_button_set_popover(m_pMenuButton, pPlaceHolder);
         }
         else
@@ -13848,6 +13857,7 @@ public:
         , m_nMRUCount(0)
         , m_nMaxMRUCount(0)
     {
+        int nActive = gtk_combo_box_get_active(m_pComboBox);
         insertAsParent(GTK_WIDGET(m_pComboBox), GTK_WIDGET(getContainer()));
         gtk_widget_set_visible(GTK_WIDGET(m_pComboBox), false);
         gtk_widget_set_no_show_all(GTK_WIDGET(m_pComboBox), true);
@@ -13935,6 +13945,9 @@ public:
         }
 
         g_list_free(cells);
+
+        if (nActive != -1)
+            tree_view_set_cursor(nActive);
 
         g_signal_connect(m_pMenuWindow, "grab-broken-event", G_CALLBACK(signalGrabBroken), this);
         g_signal_connect(m_pMenuWindow, "button-press-event", G_CALLBACK(signalButtonPress), this);

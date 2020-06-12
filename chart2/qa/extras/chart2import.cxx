@@ -91,6 +91,7 @@ public:
     void testTextBreakXLSX();
     void testNumberFormatsXLSX();
     void testNumberFormatsDOCX();
+    void testPercentageNumberFormatsDOCX();
 
     void testTransparentBackground(OUString const & filename);
 
@@ -160,6 +161,7 @@ public:
     void testTdf119138MissingAutoTitleDeleted();
     void testStockChartShiftedCategoryPosition();
     void testTdf133376();
+    void testTdf91250();
 
     CPPUNIT_TEST_SUITE(Chart2ImportTest);
     CPPUNIT_TEST(Fdo60083);
@@ -208,6 +210,7 @@ public:
     CPPUNIT_TEST(testTextBreakXLSX);
     CPPUNIT_TEST(testNumberFormatsXLSX);
     CPPUNIT_TEST(testNumberFormatsDOCX);
+    CPPUNIT_TEST(testPercentageNumberFormatsDOCX);
     CPPUNIT_TEST(testAutoTitleDelDefaultValue2007XLSX);
     CPPUNIT_TEST(testAutoTitleDelDefaultValue2013XLSX);
     CPPUNIT_TEST(testDispBlanksAsDefaultValue2007XLSX);
@@ -268,6 +271,7 @@ public:
     CPPUNIT_TEST(testTdf119138MissingAutoTitleDeleted);
     CPPUNIT_TEST(testStockChartShiftedCategoryPosition);
     CPPUNIT_TEST(testTdf133376);
+    CPPUNIT_TEST(testTdf91250);
 
     CPPUNIT_TEST_SUITE_END();
 
@@ -1310,6 +1314,26 @@ void Chart2ImportTest::testNumberFormatsDOCX()
     // LinkNumberFormatToSource should be set to false even if the OOXML contain a true value,
     // because the inner data table of charts have no own number format!
     CPPUNIT_ASSERT_MESSAGE("\"LinkNumberFormatToSource\" should be set to false.", !bLinkNumberFormatToSource);
+}
+
+void Chart2ImportTest::testPercentageNumberFormatsDOCX()
+{
+    load("/chart2/qa/extras/data/docx/", "tdf133632.docx");
+    uno::Reference< chart2::XChartDocument > xChartDoc(getChartDocFromWriter(0), uno::UNO_QUERY);
+    CPPUNIT_ASSERT(xChartDoc.is());
+
+    css::uno::Reference<chart2::XDiagram> xDiagram(xChartDoc->getFirstDiagram(), UNO_SET_THROW);
+    Reference<chart2::XDataSeries> xDataSeries = getDataSeriesFromDoc(xChartDoc, 0);
+    uno::Reference<beans::XPropertySet> xPropertySet(xDataSeries, uno::UNO_QUERY_THROW);
+    CPPUNIT_ASSERT(xPropertySet.is());
+
+    bool bLinkNumberFormatToSource = false;
+    chart2::DataPointLabel aLabel;
+    xPropertySet->getPropertyValue("Label") >>= aLabel;
+    CPPUNIT_ASSERT_EQUAL(sal_False, aLabel.ShowNumber);
+    CPPUNIT_ASSERT_EQUAL(sal_True, aLabel.ShowNumberInPercent);
+    bool bSuccess = xPropertySet->getPropertyValue(CHART_UNONAME_LINK_TO_SRC_NUMFMT) >>= bLinkNumberFormatToSource;
+    CPPUNIT_ASSERT_MESSAGE("\"LinkNumberFormatToSource\" should be set to true.", bSuccess && bLinkNumberFormatToSource);
 }
 
 void Chart2ImportTest::testAutoTitleDelDefaultValue2007XLSX()
@@ -2499,6 +2523,26 @@ void Chart2ImportTest::testTdf133376()
     awt::Point aLabelPosition = xDataPointLabel->getPosition();
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1466, aLabelPosition.X, 30);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(5269, aLabelPosition.Y, 30);
+}
+
+void Chart2ImportTest::testTdf91250()
+{
+    load("/chart2/qa/extras/data/docx/", "tdf91250.docx");
+    uno::Reference< chart2::XChartDocument > xChartDoc(getChartDocFromWriter(0), uno::UNO_QUERY);
+    CPPUNIT_ASSERT(xChartDoc.is());
+    Reference<chart2::XInternalDataProvider> xInternalProvider(xChartDoc->getDataProvider(), uno::UNO_QUERY);
+    CPPUNIT_ASSERT(xInternalProvider.is());
+
+    Reference<chart::XComplexDescriptionAccess> xDescAccess(xInternalProvider, uno::UNO_QUERY);
+    CPPUNIT_ASSERT(xDescAccess.is());
+
+    // Get the category labels.
+    Sequence<OUString> aCategories = xDescAccess->getRowDescriptions();
+    CPPUNIT_ASSERT_EQUAL(sal_Int32(4), aCategories.getLength());
+    CPPUNIT_ASSERT_EQUAL(OUString("12.3254"), aCategories[0]);
+    CPPUNIT_ASSERT_EQUAL(OUString("11.62315"), aCategories[1]);
+    CPPUNIT_ASSERT_EQUAL(OUString("9.26"), aCategories[2]);
+    CPPUNIT_ASSERT_EQUAL(OUString("8.657"), aCategories[3]);
 }
 
 CPPUNIT_TEST_SUITE_REGISTRATION(Chart2ImportTest);

@@ -298,6 +298,8 @@ namespace sw
             {
                 pNewBookmark->SetKeyCode(pOldBookmark->GetKeyCode());
                 pNewBookmark->SetShortName(pOldBookmark->GetShortName());
+                pNewBookmark->Hide(pOldBookmark->IsHidden());
+                pNewBookmark->SetHideCondition(pOldBookmark->GetHideCondition());
             }
             ::sw::mark::IFieldmark* const pNewFieldmark =
                 dynamic_cast< ::sw::mark::IFieldmark* const >(pNewMark);
@@ -4833,10 +4835,10 @@ bool DocumentContentOperationsManager::CopyImplImpl(SwPaM& rPam, SwPosition& rPo
                     }
 
                     // copy at-char flys in rPam
-                    aInsPos = *pDestTextNd; // update to new (start) node for flys
+                    SwNodeIndex temp(*pDestTextNd); // update to new (start) node for flys
                     // tdf#126626 prevent duplicate Undos
                     ::sw::UndoGuard const ug(pDoc->GetIDocumentUndoRedo());
-                    CopyFlyInFlyImpl(aRg, &rPam, aInsPos, false);
+                    CopyFlyInFlyImpl(aRg, &rPam, temp, false);
 
                     break;
                 }

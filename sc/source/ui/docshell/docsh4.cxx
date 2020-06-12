@@ -1507,7 +1507,7 @@ void ScDocShell::DoAutoStyle( const ScRange& rRange, const OUString& rStyle )
         pStylePool->FindCaseIns( rStyle, SfxStyleFamily::Para );
     if (!pStyleSheet)
         pStyleSheet = static_cast<ScStyleSheet*>(
-            pStylePool->Find( ScResId(STR_STYLENAME_STANDARD), SfxStyleFamily::Para ));
+            pStylePool->Find( ScResId(STR_STYLENAME_STANDARD_CELL), SfxStyleFamily::Para ));
     if (pStyleSheet)
     {
         OSL_ENSURE(rRange.aStart.Tab() == rRange.aEnd.Tab(),
@@ -2516,10 +2516,13 @@ void ScDocShell::LOKCommentNotify(LOKCommentNotificationType nType, const ScDocu
     boost::property_tree::write_json(aStream, aTree);
     std::string aPayload = aStream.str();
 
+    ScViewData* pViewData = GetViewData();
+    SfxViewShell* pThisViewShell = ( pViewData ? pViewData->GetViewShell() : nullptr );
     SfxViewShell* pViewShell = SfxViewShell::GetFirst();
     while (pViewShell)
     {
-        pViewShell->libreOfficeKitViewCallback(LOK_CALLBACK_COMMENT, aPayload.c_str());
+        if (pThisViewShell == nullptr || pViewShell->GetDocId() == pThisViewShell->GetDocId())
+            pViewShell->libreOfficeKitViewCallback(LOK_CALLBACK_COMMENT, aPayload.c_str());
         pViewShell = SfxViewShell::GetNext(*pViewShell);
     }
 }
